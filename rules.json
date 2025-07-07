@@ -1,0 +1,11 @@
+[
+  {
+    "action": "move",
+    "types": ["png", "jpg"],
+    "destination": "images"
+  },
+  {
+    "action": "delete",
+    "types": ["log", "tmp"]
+  }
+]
