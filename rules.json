@@ -7,5 +7,15 @@
   {
     "action": "delete",
     "types": ["log", "tmp"]
+  },
+  {
+    "action": "move",
+    "types": ["pdf"],
+    "destination": "old_pdfs",
+    "date_range": {
+      "modified": {
+        "end": "2024-01-01T00:00:00"
+      }
+    }
   }
 ]
