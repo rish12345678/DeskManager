@@ -1,20 +1,34 @@
 [
   {
+    "_comment": "Move all PNG and JPG images into a directory named 'images'. The destination directory will be created if it doesn't exist.",
     "action": "move",
-    "types": ["png", "jpg"],
+    "types": ["png", "jpg", "jpeg", "gif"],
     "destination": "images"
   },
   {
+    "_comment": "Delete all temporary and log files. This action will require confirmation unless --yes is used.",
     "action": "delete",
-    "types": ["log", "tmp"]
+    "types": ["log", "tmp", "bak"]
   },
   {
+    "_comment": "Move all PDF documents modified before 2023 into an 'Archive/PDFs' folder.",
     "action": "move",
     "types": ["pdf"],
-    "destination": "old_pdfs",
+    "destination": "Archive/PDFs",
     "date_range": {
       "modified": {
-        "end": "2024-01-01T00:00:00"
+        "end": "2023-01-01T00:00:00"
+      }
+    }
+  },
+  {
+    "_comment": "Move all Word documents created since the start of 2024 into a 'Documents/2024' folder.",
+    "action": "move",
+    "types": ["doc", "docx"],
+    "destination": "Documents/2024",
+    "date_range": {
+      "created": {
+        "start": "2024-01-01T00:00:00"
       }
     }
   }

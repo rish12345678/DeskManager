@@ -1,0 +1,30 @@
+2025-07-08 14:13:38,405 - INFO - DeskManager session started.
+2025-07-08 14:13:38,405 - INFO - Log file created at: logs/deskmanager_2025-07-08_14-13-38.log
+2025-07-08 14:13:38,409 - INFO - Loading rules from 'rules.json'...
+2025-07-08 14:13:38,410 - INFO - Successfully loaded 4 rules.
+2025-07-08 14:13:38,410 - INFO - Scanning directory: '../test_workspace'
+2025-07-08 14:13:38,410 - INFO - Found 6 top-level files to process.
+2025-07-08 14:13:38,411 - INFO - Matched 5 files to rules.
+2025-07-08 14:13:38,411 - INFO - --- Matched Files Summary ---
+2025-07-08 14:13:38,411 - INFO -   - File: temp.tmp, Action: delete
+2025-07-08 14:13:38,411 - INFO -   - File: error.log, Action: delete
+2025-07-08 14:13:38,411 - INFO -   - File: photo.jpg, Action: move
+2025-07-08 14:13:38,411 - INFO -   - File: logo.png, Action: move
+2025-07-08 14:13:38,411 - INFO -   - File: report_new.docx, Action: move
+2025-07-08 14:13:38,411 - WARNING - The following files are scheduled for permanent deletion:
+2025-07-08 14:13:38,411 - WARNING -   - temp.tmp
+2025-07-08 14:13:38,411 - WARNING -   - error.log
+2025-07-08 14:13:38,411 - INFO - Deletion confirmed by user.
+2025-07-08 14:13:38,411 - INFO - --- EXECUTING ACTIONS ---
+2025-07-08 14:13:38,411 - INFO - [DELETE] 'temp.tmp'
+2025-07-08 14:13:38,412 - INFO - [DELETE] 'error.log'
+2025-07-08 14:13:38,412 - INFO - [MOVE] 'photo.jpg' -> '../test_workspace/images/'
+2025-07-08 14:13:38,412 - INFO - [MOVE] 'logo.png' -> '../test_workspace/images/'
+2025-07-08 14:13:38,412 - INFO - [MOVE] 'report_new.docx' -> '../test_workspace/Documents/2024/'
+2025-07-08 14:13:38,413 - INFO - --- OPERATION SUMMARY ---
+2025-07-08 14:13:38,413 - INFO - Execution complete. The following actions were performed:
+2025-07-08 14:13:38,413 - INFO -   - Files Moved: 3
+2025-07-08 14:13:38,413 - INFO -   - Files Deleted: 2
+2025-07-08 14:13:38,413 - INFO -   - Files Compressed: 0
+2025-07-08 14:13:38,413 - INFO -   - Total Size of Affected Files: 0B
+2025-07-08 14:13:38,413 - INFO - DeskManager session finished.

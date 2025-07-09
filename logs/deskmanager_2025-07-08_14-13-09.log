@@ -1,0 +1,26 @@
+2025-07-08 14:13:09,760 - INFO - DeskManager session started.
+2025-07-08 14:13:09,760 - INFO - Log file created at: logs/deskmanager_2025-07-08_14-13-09.log
+2025-07-08 14:13:09,761 - INFO - Loading rules from 'rules.json'...
+2025-07-08 14:13:09,762 - INFO - Successfully loaded 4 rules.
+2025-07-08 14:13:09,762 - INFO - Scanning directory: '../test_workspace'
+2025-07-08 14:13:09,762 - INFO - Found 6 top-level files to process.
+2025-07-08 14:13:09,762 - INFO - Matched 5 files to rules.
+2025-07-08 14:13:09,763 - INFO - --- Matched Files Summary ---
+2025-07-08 14:13:09,763 - INFO -   - File: temp.tmp, Action: delete
+2025-07-08 14:13:09,763 - INFO -   - File: error.log, Action: delete
+2025-07-08 14:13:09,763 - INFO -   - File: photo.jpg, Action: move
+2025-07-08 14:13:09,763 - INFO -   - File: logo.png, Action: move
+2025-07-08 14:13:09,763 - INFO -   - File: report_new.docx, Action: move
+2025-07-08 14:13:09,763 - INFO - --- DRY RUN ---
+2025-07-08 14:13:09,763 - INFO - [DELETE] 'temp.tmp'
+2025-07-08 14:13:09,763 - INFO - [DELETE] 'error.log'
+2025-07-08 14:13:09,763 - INFO - [MOVE] 'photo.jpg' -> '../test_workspace/images/'
+2025-07-08 14:13:09,763 - INFO - [MOVE] 'logo.png' -> '../test_workspace/images/'
+2025-07-08 14:13:09,763 - INFO - [MOVE] 'report_new.docx' -> '../test_workspace/Documents/2024/'
+2025-07-08 14:13:09,763 - INFO - --- OPERATION SUMMARY ---
+2025-07-08 14:13:09,763 - INFO - Dry run complete. The following actions were planned:
+2025-07-08 14:13:09,763 - INFO -   - Files to be Moved: 0
+2025-07-08 14:13:09,763 - INFO -   - Files to be Deleted: 0
+2025-07-08 14:13:09,763 - INFO -   - Files to be Compressed: 0
+2025-07-08 14:13:09,763 - INFO -   - Total Size of Affected Files: 0B
+2025-07-08 14:13:09,763 - INFO - DeskManager session finished.

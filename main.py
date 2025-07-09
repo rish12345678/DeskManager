@@ -4,135 +4,266 @@ import sys
 from pathlib import Path
 from datetime import datetime, timezone
 import shutil
+import logging
 
-def load_config(config_path):
-    """Loads the rules from a JSON configuration file."""
-    try:
-        with open(config_path, 'r') as f:
-            rules = json.load(f)
-        return rules
-    except FileNotFoundError:
-        print(f"Error: Configuration file not found at '{config_path}'")
-        sys.exit(1)
-    except json.JSONDecodeError:
-        print(f"Error: Invalid JSON in configuration file at '{config_path}'")
-        sys.exit(1)
+class DeskManager:
+    """A class to organize files in a directory based on a set of rules."""
 
-def scan_directory(dir_path):
-    """Scans the target directory for top-level files."""
-    try:
-        directory = Path(dir_path)
-        if not directory.is_dir():
-            print(f"Error: Target directory '{dir_path}' does not exist or is not a directory.")
+    def __init__(self, target_dir, config_path, dry_run=False, auto_confirm=False):
+        """Initializes the DeskManager."""
+        self.target_dir = Path(target_dir)
+        self.config_path = config_path
+        self.dry_run = dry_run
+        self.auto_confirm = auto_confirm
+        self.rules = self._load_config()
+        self.summary = {'moved': 0, 'deleted': 0, 'compressed': 0, 'total_size_bytes': 0}
+
+    def _load_config(self):
+        """Loads and validates the rules from the JSON configuration file."""
+        logging.info(f"Loading rules from '{self.config_path}'...")
+        try:
+            with open(self.config_path, 'r') as f:
+                rules = json.load(f)
+            logging.info(f"Successfully loaded {len(rules)} rules.")
+            return rules
+        except FileNotFoundError:
+            logging.error(f"Configuration file not found at '{self.config_path}'")
+            sys.exit(1)
+        except json.JSONDecodeError:
+            logging.error(f"Invalid JSON in configuration file at '{self.config_path}'")
+            sys.exit(1)
+
+    def _scan_directory(self):
+        """Scans the target directory for top-level files."""
+        logging.info(f"Scanning directory: '{self.target_dir}'")
+        if not self.target_dir.is_dir():
+            logging.error(f"Target directory '{self.target_dir}' does not exist or is not a directory.")
             sys.exit(1)
         
-        # List files in the directory, excluding subdirectories
-        files = [f for f in directory.iterdir() if f.is_file()]
-        return files
-    except PermissionError:
-        print(f"Error: Permission denied to access directory '{dir_path}'.")
-        sys.exit(1)
+        try:
+            files = [f for f in self.target_dir.iterdir() if f.is_file()]
+            logging.info(f"Found {len(files)} top-level files to process.")
+            return files
+        except PermissionError:
+            logging.error(f"Permission denied to access directory '{self.target_dir}'.")
+            sys.exit(1)
 
-def filter_files(files, rules):
-    """Filters files based on the provided rules."""
-    matched_files = []
-    for file in files:
-        for rule in rules:
-            # A file must match ALL conditions in a rule to be considered a match.
-            
-            # 1. Check file type
-            if 'types' in rule:
-                file_extension = file.suffix.lower().lstrip('.')
-                if file_extension not in [t.lower() for t in rule['types']]:
-                    continue  # Does not match type, try next rule
-
-            # 2. Check date range
-            if 'date_range' in rule:
-                try:
-                    date_config = rule['date_range']
-                    
-                    # Check for modified date
-                    if 'modified' in date_config:
-                        file_date = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
-                        start_str = date_config['modified'].get('start')
-                        end_str = date_config['modified'].get('end')
-
-                        start_date = datetime.fromisoformat(start_str).replace(tzinfo=timezone.utc) if start_str else None
-                        end_date = datetime.fromisoformat(end_str).replace(tzinfo=timezone.utc) if end_str else None
-
-                        if (start_date and file_date < start_date) or (end_date and file_date > end_date):
-                            continue # File's modified date is outside the range
-
-                    # Check for created date
-                    if 'created' in date_config:
-                        file_date = datetime.fromtimestamp(file.stat().st_ctime, tz=timezone.utc)
-                        start_str = date_config['created'].get('start')
-                        end_str = date_config['created'].get('end')
-
-                        start_date = datetime.fromisoformat(start_str).replace(tzinfo=timezone.utc) if start_str else None
-                        end_date = datetime.fromisoformat(end_str).replace(tzinfo=timezone.utc) if end_str else None
-
-                        if (start_date and file_date < start_date) or (end_date and file_date > end_date):
-                            continue # File's created date is outside the range
+    def _filter_files(self, files):
+        """Filters files based on the provided rules."""
+        matched_files = []
+        for file in files:
+            for rule in self.rules:
+                # A file must match ALL conditions in a rule to be considered a match.
                 
-                except (ValueError, TypeError) as e:
-                    print(f"Warning: Skipping invalid date range in rule: {rule}. Error: {e}")
+                # 1. Check file type
+                if 'types' in rule:
+                    file_extension = file.suffix.lower().lstrip('.')
+                    if file_extension not in [t.lower() for t in rule['types']]:
+                        continue  # Does not match type, try next rule
+
+                # 2. Check date range
+                if 'date_range' in rule:
+                    try:
+                        date_config = rule['date_range']
+                        stat_info = file.stat() # Get file stats once
+
+                        # Check for modified date
+                        if 'modified' in date_config:
+                            file_date = datetime.fromtimestamp(stat_info.st_mtime, tz=timezone.utc)
+                            start_str = date_config['modified'].get('start')
+                            end_str = date_config['modified'].get('end')
+                            
+                            start_date = datetime.fromisoformat(start_str).replace(tzinfo=timezone.utc) if start_str else None
+                            end_date = datetime.fromisoformat(end_str).replace(tzinfo=timezone.utc) if end_str else None
+
+                            if (start_date and file_date < start_date) or \
+                               (end_date and file_date > end_date):
+                                continue
+
+                        # Check for created date (using birthtime for correctness)
+                        if 'created' in date_config:
+                            # st_birthtime is the correct "creation" time on supported systems (macOS, BSD)
+                            # st_ctime is "metadata change" time on Linux. We default to it if birthtime is unavailable.
+                            created_timestamp = getattr(stat_info, 'st_birthtime', stat_info.st_ctime)
+                            file_date = datetime.fromtimestamp(created_timestamp, tz=timezone.utc)
+
+                            start_str = date_config['created'].get('start')
+                            end_str = date_config['created'].get('end')
+
+                            start_date = datetime.fromisoformat(start_str).replace(tzinfo=timezone.utc) if start_str else None
+                            end_date = datetime.fromisoformat(end_str).replace(tzinfo=timezone.utc) if end_str else None
+
+                            if (start_date and file_date < start_date) or \
+                               (end_date and file_date > end_date):
+                                continue
+                    
+                    except (ValueError, TypeError) as e:
+                        logging.warning(f"Skipping invalid date range in rule: {rule}. Error: {e}")
+                        continue
+
+                # If all conditions passed, we have a match.
+                matched_files.append({'file': file, 'rule': rule})
+                break
+                
+        logging.info(f"Matched {len(matched_files)} files to rules.")
+        return matched_files
+
+    def _execute_actions(self, matched_files):
+        """Executes the actions for the matched files."""
+        if not matched_files:
+            return
+
+        # --- Deletion Confirmation ---
+        files_to_delete = [m['file'] for m in matched_files if m['rule'].get('action') == 'delete']
+        deletions_approved = True
+
+        if files_to_delete and not self.dry_run and not self.auto_confirm:
+            logging.warning("The following files are scheduled for permanent deletion:")
+            for f in files_to_delete:
+                logging.warning(f"  - {f.name}")
+            
+            try:
+                confirm = input("Are you sure you want to delete these files? Type 'yes' to confirm: ")
+                if confirm.lower() != 'yes':
+                    logging.info("Deletion cancelled by user.")
+                    deletions_approved = False
+                else:
+                    logging.info("Deletion confirmed by user.")
+            except (EOFError, KeyboardInterrupt):
+                logging.warning("\nDeletion prompt cancelled. No files will be deleted.")
+                deletions_approved = False
+
+        logging.info(f"--- {'DRY RUN' if self.dry_run else 'EXECUTING ACTIONS'} ---")
+
+        for match in matched_files:
+            action = match['rule'].get('action')
+            file_path = match['file']
+
+            if action == 'move':
+                destination = match['rule'].get('destination')
+                if not destination:
+                    logging.warning(f"Skipping move for '{file_path.name}' due to missing 'destination' in rule.")
                     continue
 
-            # If all conditions passed, we have a match.
-            matched_files.append({'file': file, 'rule': rule})
-            break  # Move to the next file since we found a matching rule
-            
-    return matched_files
+                dest_dir = self.target_dir / destination
+                dest_file = dest_dir / file_path.name
+                
+                log_msg = f"[MOVE] '{file_path.name}' -> '{dest_dir}/'"
+                logging.info(log_msg)
 
-def execute_actions(matched_files, base_dir, dry_run):
-    """Executes the actions defined in the rules for the matched files."""
-    summary = {'moved': 0, 'deleted': 0, 'compressed': 0}
+                if not self.dry_run:
+                    try:
+                        file_size = file_path.stat().st_size
+                        dest_dir.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(file_path), str(dest_file))
+                        self.summary['moved'] += 1
+                        self.summary['total_size_bytes'] += file_size
+                    except (OSError, PermissionError, FileNotFoundError) as e:
+                        logging.error(f"Could not move file '{file_path.name}': {e}")
+            
+            elif action == 'delete':
+                if deletions_approved:
+                    log_msg = f"[DELETE] '{file_path.name}'"
+                    logging.info(log_msg)
+
+                    if not self.dry_run:
+                        try:
+                            file_size = file_path.stat().st_size
+                            file_path.unlink()
+                            self.summary['deleted'] += 1
+                            self.summary['total_size_bytes'] += file_size
+                        except (OSError, PermissionError, FileNotFoundError) as e:
+                            logging.error(f"Could not delete file '{file_path.name}': {e}")
+                else:
+                    logging.warning(f"Skipping deletion of '{file_path.name}' due to user cancellation.")
+
+            elif action == 'compress':
+                logging.info(f"[COMPRESS] '{file_path.name}' (not yet implemented).")
+
+    def _print_summary_report(self, matched_files):
+        """Prints a formatted summary of the operations."""
+        logging.info("--- OPERATION SUMMARY ---")
+
+        if self.dry_run:
+            planned_summary = {'moved': 0, 'deleted': 0, 'compressed': 0, 'total_size_bytes': 0}
+            for match in matched_files:
+                action = match['rule'].get('action', 'none')
+                if action in planned_summary:
+                    planned_summary[action] += 1
+                try:
+                    # Ensure we are checking a file that exists for stat
+                    if Path(match['file']).exists():
+                        planned_summary['total_size_bytes'] += match['file'].stat().st_size
+                except (FileNotFoundError, PermissionError):
+                    logging.warning(f"Could not calculate size for '{match['file'].name}', file may have been moved or permission denied.")
+
+            logging.info("Dry run complete. The following actions were planned:")
+            logging.info(f"  - Files to be Moved: {planned_summary['moved']}")
+            logging.info(f"  - Files to be Deleted: {planned_summary['deleted']}")
+            logging.info(f"  - Files to be Compressed: {planned_summary['compressed']}")
+            total_size_formatted = format_bytes(planned_summary['total_size_bytes'])
+            logging.info(f"  - Total Size of Affected Files: {total_size_formatted}")
+
+        else:
+            logging.info("Execution complete. The following actions were performed:")
+            logging.info(f"  - Files Moved: {self.summary['moved']}")
+            logging.info(f"  - Files Deleted: {self.summary['deleted']}")
+            logging.info(f"  - Files Compressed: {self.summary['compressed']}")
+            total_size_formatted = format_bytes(self.summary['total_size_bytes'])
+            logging.info(f"  - Total Size of Affected Files: {total_size_formatted}")
+
+        logging.info("DeskManager session finished.")
+
+    def run(self):
+        """Runs the complete organization process."""
+        files_to_process = self._scan_directory()
+        matched_files = self._filter_files(files_to_process)
+        
+        if matched_files:
+            logging.info("--- Matched Files Summary ---")
+            for match in matched_files:
+                logging.info(f"  - File: {match['file'].name}, Action: {match['rule']['action']}")
+        
+        self._execute_actions(matched_files)
+        self._print_summary_report(matched_files)
+
+
+def setup_logging():
+    """Sets up a timestamped log file in the 'logs' directory."""
+    log_dir = Path('logs')
+    log_dir.mkdir(exist_ok=True)
     
-    if not matched_files:
-        return summary
+    log_filename = f"deskmanager_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+    log_path = log_dir / log_filename
 
-    print(f"\n--- {'DRY RUN' if dry_run else 'EXECUTING ACTIONS'} ---")
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_path),
+            logging.StreamHandler(sys.stdout) # Also print logs to console
+        ]
+    )
+    logging.info("DeskManager session started.")
+    logging.info(f"Log file created at: {log_path}")
+    return log_path
 
-    for match in matched_files:
-        action = match['rule'].get('action')
-        file_path = match['file']
-
-        if action == 'move':
-            destination = match['rule'].get('destination')
-            if not destination:
-                print(f"Warning: Skipping move for '{file_path.name}' due to missing 'destination' in rule.")
-                continue
-
-            dest_dir = Path(base_dir) / destination
-            dest_file = dest_dir / file_path.name
-            
-            print(f"[MOVE] '{file_path.name}' -> '{dest_dir}/'")
-            if not dry_run:
-                try:
-                    dest_dir.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(file_path), str(dest_file))
-                    summary['moved'] += 1
-                except (OSError, PermissionError) as e:
-                    print(f"  -> ERROR: Could not move file: {e}")
-        
-        elif action == 'delete':
-            print(f"[DELETE] '{file_path.name}'")
-            if not dry_run:
-                try:
-                    file_path.unlink()
-                    summary['deleted'] += 1
-                except (OSError, PermissionError) as e:
-                    print(f"  -> ERROR: Could not delete file: {e}")
-        
-        elif action == 'compress':
-            print(f"[COMPRESS] '{file_path.name}' (not yet implemented).")
-            # In a future step, this would be implemented
-            # summary['compressed'] += 1
-
-    return summary
+def format_bytes(size_bytes):
+    """Converts bytes to a human-readable format (KB, MB, GB)."""
+    if size_bytes == 0:
+        return "0B"
+    power = 1024
+    n = 0
+    power_labels = {0: '', 1: 'K', 2: 'M', 3: 'G', 4: 'T'}
+    while size_bytes >= power and n < len(power_labels) -1:
+        size_bytes /= power
+        n += 1
+    return f"{size_bytes:.2f}{power_labels[n]}B"
 
 def main():
+    """Main function to parse arguments and run the DeskManager."""
+    setup_logging()
+
     parser = argparse.ArgumentParser(description="DeskManager - Smart Desktop Organizer")
     parser.add_argument(
         "--dir",
@@ -151,35 +282,22 @@ def main():
         action="store_true",
         help="Simulate the organization process without making any changes."
     )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Automatically confirm all prompts, such as file deletions."
+    )
 
     args = parser.parse_args()
 
-    print("DeskManager CLI")
-    print(f"Target Directory: {args.dir}")
-    print(f"Config File: {args.config}")
-    print(f"Dry Run: {args.dry_run}")
-
-    rules = load_config(args.config)
-    print("\nLoaded Rules:")
-    print(json.dumps(rules, indent=2))
-
-    files_to_process = scan_directory(args.dir)
-    print("\nFound Files to Scan:")
-    if not files_to_process:
-        print("No files found in the target directory.")
-    for f in files_to_process:
-        print(f" - {f.name}")
-
-    matched_files = filter_files(files_to_process, rules)
-    print("\nMatched Files for Processing:")
-    if not matched_files:
-        print("No files matched any rules.")
-    else:
-        for match in matched_files:
-            print(f" - File: {match['file'].name}, Action: {match['rule']['action']}")
-
-    execute_actions(matched_files, args.dir, args.dry_run)
-
+    # Create a DeskManager instance and run the process
+    manager = DeskManager(
+        target_dir=args.dir,
+        config_path=args.config,
+        dry_run=args.dry_run,
+        auto_confirm=args.yes
+    )
+    manager.run()
 
 if __name__ == "__main__":
     main()

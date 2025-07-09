@@ -1,0 +1,18 @@
+2025-07-08 14:14:21,409 - INFO - DeskManager session started.
+2025-07-08 14:14:21,409 - INFO - Log file created at: logs/deskmanager_2025-07-08_14-14-21.log
+2025-07-08 14:14:21,410 - INFO - Loading rules from 'rules.json'...
+2025-07-08 14:14:21,410 - INFO - Successfully loaded 4 rules.
+2025-07-08 14:14:21,410 - INFO - Scanning directory: '../test_workspace'
+2025-07-08 14:14:21,410 - INFO - Found 2 top-level files to process.
+2025-07-08 14:14:21,410 - INFO - Matched 1 files to rules.
+2025-07-08 14:14:21,410 - INFO - --- Matched Files Summary ---
+2025-07-08 14:14:21,410 - INFO -   - File: another.log, Action: delete
+2025-07-08 14:14:21,410 - INFO - --- EXECUTING ACTIONS ---
+2025-07-08 14:14:21,410 - INFO - [DELETE] 'another.log'
+2025-07-08 14:14:21,411 - INFO - --- OPERATION SUMMARY ---
+2025-07-08 14:14:21,411 - INFO - Execution complete. The following actions were performed:
+2025-07-08 14:14:21,411 - INFO -   - Files Moved: 0
+2025-07-08 14:14:21,411 - INFO -   - Files Deleted: 1
+2025-07-08 14:14:21,411 - INFO -   - Files Compressed: 0
+2025-07-08 14:14:21,411 - INFO -   - Total Size of Affected Files: 0B
+2025-07-08 14:14:21,411 - INFO - DeskManager session finished.
