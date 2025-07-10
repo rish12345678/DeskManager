@@ -227,6 +227,110 @@ class DeskManager:
         self._execute_actions(matched_files)
         self._print_summary_report(matched_files)
 
+    def run_interactive(self):
+        """Runs the program in interactive mode, prompting the user to build a rule."""
+        logging.info("Starting interactive session...")
+        print("\n--- DeskManager Interactive Mode ---\n")
+        print("Let's build a rule to organize your files.")
+
+        try:
+            # 1. Get Action
+            action = self._prompt_for_action()
+            rule = {"action": action}
+
+            # 2. Get Destination (if moving)
+            if action == 'move':
+                destination = input("Enter the destination folder (e.g., 'images' or 'Archive/PDFs'): ")
+                if not destination.strip():
+                    print("Destination cannot be empty. Aborting.")
+                    return
+                rule['destination'] = destination
+
+            # 3. Get File Types
+            types_str = input("Enter file types to target, separated by spaces (e.g., 'png jpg pdf').\nLeave blank to target ALL file types: ")
+            if types_str.strip():
+                rule['types'] = types_str.lower().split()
+
+            # 4. Get Date Range
+            if self._prompt_for_date_filter():
+                rule['date_range'] = self._prompt_for_date_details()
+
+            # --- Rule creation is complete ---
+            self.rules = [rule] # Overwrite any existing rules with our new dynamic one
+            print("\nRule created successfully:")
+            print(json.dumps(self.rules, indent=2))
+
+            # Use the existing logic to run the process
+            self.run()
+
+        except (KeyboardInterrupt, EOFError):
+            print("\n\nInteractive session cancelled by user. Exiting.")
+            sys.exit(0)
+    
+    def _prompt_for_action(self):
+        """Prompts the user to select an action."""
+        while True:
+            action = input("Choose an action: [M]ove or [D]elete? ").lower().strip()
+            if action in ['m', 'move']:
+                return 'move'
+            elif action in ['d', 'delete']:
+                return 'delete'
+            print("Invalid input. Please enter 'm' or 'd'.")
+
+    def _prompt_for_date_filter(self):
+        """Asks the user if they want to filter by date."""
+        while True:
+            choice = input("Filter by date? [Y]es or [N]o? ").lower().strip()
+            if choice in ['y', 'yes']:
+                return True
+            elif choice in ['n', 'no']:
+                return False
+            print("Invalid input. Please enter 'y' or 'n'.")
+
+    def _prompt_for_date_details(self):
+        """Prompts for the specifics of the date filter."""
+        date_range = {}
+        
+        # Get date type
+        while True:
+            date_type = input("Filter by [C]reated or [M]odified date? ").lower().strip()
+            if date_type in ['c', 'created']:
+                date_key = 'created'
+                break
+            elif date_type in ['m', 'modified']:
+                date_key = 'modified'
+                break
+            print("Invalid input. Please enter 'c' or 'm'.")
+        
+        date_range[date_key] = {}
+
+        # Get start/end date
+        while True:
+            bounds = input("Filter by [S]tart date, [E]nd date, or [B]oth? ").lower().strip()
+            if bounds in ['s', 'start', 'e', 'end', 'b', 'both']:
+                break
+            print("Invalid input. Please enter 's', 'e', or 'b'.")
+
+        if bounds in ['s', 'start', 'b', 'both']:
+            start_date_str = self._prompt_for_valid_date("Enter the start date (YYYY-MM-DD): ")
+            date_range[date_key]['start'] = f"{start_date_str}T00:00:00"
+            
+        if bounds in ['e', 'end', 'b', 'both']:
+            end_date_str = self._prompt_for_valid_date("Enter the end date (YYYY-MM-DD): ")
+            date_range[date_key]['end'] = f"{end_date_str}T23:59:59"
+            
+        return date_range
+
+    def _prompt_for_valid_date(self, prompt_text):
+        """Prompts the user until a valid YYYY-MM-DD date is entered."""
+        while True:
+            date_str = input(prompt_text).strip()
+            try:
+                datetime.strptime(date_str, '%Y-%m-%d')
+                return date_str
+            except ValueError:
+                print("Invalid format. Please use YYYY-MM-DD.")
+
 
 def setup_logging():
     """Sets up a timestamped log file in the 'logs' directory."""
@@ -265,29 +369,16 @@ def main():
     setup_logging()
 
     parser = argparse.ArgumentParser(description="DeskManager - Smart Desktop Organizer")
+    parser.add_argument("--dir", type=str, required=True, help="The target directory to organize.")
+    parser.add_argument("--config", type=str, default="rules.json", help="Path to the rules configuration file.")
+    parser.add_argument("--dry-run", action="store_true", help="Simulate the process without making changes.")
+    parser.add_argument("--yes", action="store_true", help="Automatically confirm all prompts.")
     parser.add_argument(
-        "--dir",
-        type=str,
-        required=True,
-        help="The target directory to organize."
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        default="rules.json",
-        help="Path to the rules configuration file (default: rules.json)."
-    )
-    parser.add_argument(
-        "--dry-run",
+        "--interactive",
         action="store_true",
-        help="Simulate the organization process without making any changes."
+        help="Run the program in interactive mode to build a rule on the fly."
     )
-    parser.add_argument(
-        "--yes",
-        action="store_true",
-        help="Automatically confirm all prompts, such as file deletions."
-    )
-
+    
     args = parser.parse_args()
 
     # Create a DeskManager instance and run the process
@@ -297,7 +388,11 @@ def main():
         dry_run=args.dry_run,
         auto_confirm=args.yes
     )
-    manager.run()
+    
+    if args.interactive:
+        manager.run_interactive()
+    else:
+        manager.run()
 
 if __name__ == "__main__":
     main()
